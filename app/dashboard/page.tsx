@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [showCapture, setShowCapture] = useState(false);
   const [verifying, setVerifying] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -69,6 +70,14 @@ export default function DashboardPage() {
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();
+  };
+
+  const handleCopy = async () => {
+    if (!profile?.badge_token) return;
+    const code = `<script src="https://fezlo-app.netlify.app/widget.js" data-fezlo-token="${profile.badge_token}"></script>`;
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   if (loading) {
@@ -131,11 +140,17 @@ export default function DashboardPage() {
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
               <h3 className="mb-2 font-semibold text-sm">Votre badge, sur n'importe quel site</h3>
               <p className="text-xs text-zinc-500 mb-4">
-                Ce code contient votre identifiant secret personnel — ne le partagez qu'avec des sites de confiance. Collez-le dans le HTML de votre profil pour afficher votre badge Fezlo.
+                Ce code contient votre identifiant personnel de badge — il ne permet que d'afficher votre statut de vérification, rien d'autre. Collez-le dans le HTML de votre site pour afficher votre badge Fezlo.
               </p>
               <pre className="bg-black/40 rounded-lg p-3 text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all">
                 {embedCode}
               </pre>
+              <button
+                onClick={handleCopy}
+                className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-white hover:bg-white/10"
+              >
+                {copied ? "Copié ✓" : "Copier le code"}
+              </button>
             </div>
           </>
         )}
