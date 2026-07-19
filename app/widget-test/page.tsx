@@ -6,7 +6,7 @@ export default function WidgetTestPage() {
   useEffect(() => {
     const script = document.createElement("script");
     script.src = "/widget.js";
-    script.setAttribute("data-fezlo-handle", "gettruvem");
+    script.setAttribute("data-fezlo-token", "5a079998-537a-4ecd-9ed2-74478b43b853");
     document.getElementById("widget-slot")?.appendChild(script);
   }, []);
 
