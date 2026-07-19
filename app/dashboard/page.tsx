@@ -11,6 +11,7 @@ interface Profile {
   verified_at: string | null;
   trust_score: number;
   badge_tier: string;
+  badge_token: string | null;
   created_at: string;
 }
 
@@ -79,6 +80,7 @@ export default function DashboardPage() {
 
   const isVerified = profile.verified_at !== null;
   const displayHandle = profile.handle ?? "utilisateur";
+  const embedCode = `<script src="https://fezlo-app.netlify.app/widget.js" data-fezlo-token="${profile.badge_token}"></script>`;
 
   return (
     <main className="min-h-screen bg-[#0a0a0f] text-white">
@@ -122,9 +124,20 @@ export default function DashboardPage() {
           </button>
         )}
         {isVerified && (
-          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center">
-            <p className="text-sm text-emerald-400">✅ Vous êtes vérifié.</p>
-          </div>
+          <>
+            <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center mb-6">
+              <p className="text-sm text-emerald-400">✅ Vous êtes vérifié.</p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+              <h3 className="mb-2 font-semibold text-sm">Votre badge, sur n'importe quel site</h3>
+              <p className="text-xs text-zinc-500 mb-4">
+                Ce code contient votre identifiant secret personnel — ne le partagez qu'avec des sites de confiance. Collez-le dans le HTML de votre profil pour afficher votre badge Fezlo.
+              </p>
+              <pre className="bg-black/40 rounded-lg p-3 text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all">
+                {embedCode}
+              </pre>
+            </div>
+          </>
         )}
         {showCapture && (
           <div className="mt-6 rounded-2xl border border-white/10 bg-[#111118] p-6">
