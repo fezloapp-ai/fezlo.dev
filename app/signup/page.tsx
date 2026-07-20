@@ -44,6 +44,9 @@ function SignupInner() {
   };
 
   const handleGoogleSignup = async () => {
+    if (refHandle && typeof window !== "undefined") {
+      localStorage.setItem("fezlo_pending_ref", refHandle);
+    }
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: `${window.location.origin}/dashboard` },

@@ -66,6 +66,14 @@ export default function DashboardPage() {
         return;
       }
       setProfile(data);
+      if (!data.referred_by && typeof window !== "undefined") {
+        const pendingRef = localStorage.getItem("fezlo_pending_ref");
+        if (pendingRef) {
+          await supabase.from("profiles").update({ referred_by: pendingRef }).eq("id", session.user.id);
+          localStorage.removeItem("fezlo_pending_ref");
+          data.referred_by = pendingRef;
+        }
+      }
       if (data.handle) {
         const { count } = await supabase
           .from("profiles")
