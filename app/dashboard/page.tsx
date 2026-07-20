@@ -1,6 +1,32 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+
+function BadgePreview({ token }: { token: string }) {
+  const [state, setState] = useState<"loading" | "verified" | "not_verified" | "error">("loading");
+  const [errMsg, setErrMsg] = useState("");
+
+  useEffect(() => {
+    fetch("/api/verify/" + encodeURIComponent(token))
+      .then((res) => res.json())
+      .then((data) => {
+        setState(data.verified ? "verified" : "not_verified");
+      })
+      .catch((err) => {
+        setState("error");
+        setErrMsg(String(err));
+      });
+  }, [token]);
+
+  if (state === "loading") return <span className="text-xs text-zinc-500">Chargement...</span>;
+  if (state === "error") return <span className="text-xs text-red-500 break-all">Erreur: {errMsg}</span>;
+  if (state === "not_verified") return <span className="text-xs text-zinc-500">Non vérifié</span>;
+  return (
+    <a href="https://fezlo-app.netlify.app" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600 border border-emerald-200">
+      ✓ Vérifié par Fezlo
+    </a>
+  );
+}
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import WebcamCapture from "@/components/WebcamCapture";
@@ -18,7 +44,6 @@ interface Profile {
 export default function DashboardPage() {
   const router = useRouter();
   const supabase = createClient();
-  const previewRef = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [referredCount, setReferredCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -52,15 +77,6 @@ export default function DashboardPage() {
     };
     fetchProfile();
   }, []);
-
-  useEffect(() => {
-    if (!profile?.badge_token || !previewRef.current) return;
-    previewRef.current.innerHTML = "";
-    const script = document.createElement("script");
-    script.src = "/widget.js";
-    script.setAttribute("data-fezlo-token", profile.badge_token);
-    previewRef.current.appendChild(script);
-  }, [profile?.badge_token]);
 
   const handleVerificationSuccess = async () => {
     setVerifying(true);
@@ -181,7 +197,7 @@ export default function DashboardPage() {
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 mb-6">
               <h3 className="mb-2 font-semibold text-sm">Aperçu de votre badge</h3>
               <p className="text-xs text-zinc-500 mb-4">Voici exactement à quoi il ressemblera sur votre site.</p>
-              <div ref={previewRef} className="min-h-[32px]" />
+              <div className="min-h-[32px]">{profile.badge_token && <BadgePreview token={profile.badge_token} />}</div>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 mb-6">
