@@ -16,6 +16,7 @@ export default function WebcamCapture({ onSuccess, onError }: WebcamCaptureProps
   const [status, setStatus] = useState<'idle' | 'loading' | 'active' | 'denied'>('idle')
   const [challengeState, setChallengeState] = useState<'ready' | 'running' | 'success' | 'failed'>('ready')
   const [photo, setPhoto] = useState<string | null>(null)
+  const [debugError, setDebugError] = useState<string | null>(null)
   const noseXStart = useRef<number | null>(null)
   const maxDelta = useRef(0)
 
@@ -79,11 +80,14 @@ export default function WebcamCapture({ onSuccess, onError }: WebcamCaptureProps
 
   async function finishChallenge() {
     const moved = maxDelta.current > 0.04
-    const { data: inserted } = await supabase
+    const { data: inserted, error: insertError } = await supabase
       .from('verifications')
       .insert({ motion_score: maxDelta.current, passed: moved })
       .select('id')
       .single()
+    if (insertError) {
+      setDebugError(insertError.message)
+    }
     if (moved) {
       capturePhoto()
       setChallengeState('success')
@@ -128,6 +132,7 @@ export default function WebcamCapture({ onSuccess, onError }: WebcamCaptureProps
         <div className="text-center">
           <p className="text-green-500 mb-2">Enregistré ✓</p>
           <img src={photo} alt="capture" className="rounded-xl w-48" />
+          {debugError && <p className="text-red-500 text-xs mt-2 break-all">Erreur debug: {debugError}</p>}
           <button onClick={startChallenge} className="block mx-auto mt-4 text-yellow-500 underline">Recommencer</button>
         </div>
       )}
