@@ -5,7 +5,7 @@ import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision'
 import { supabase } from '@/lib/supabase'
 
 interface WebcamCaptureProps {
-  onSuccess?: (motionScore: number) => void
+  onSuccess?: (motionScore: number, verificationId: string) => void
   onError?: (message: string) => void
 }
 
@@ -79,14 +79,15 @@ export default function WebcamCapture({ onSuccess, onError }: WebcamCaptureProps
 
   async function finishChallenge() {
     const moved = maxDelta.current > 0.04
-    await supabase.from('verifications').insert({
-      motion_score: maxDelta.current,
-      passed: moved,
-    })
+    const { data: inserted } = await supabase
+      .from('verifications')
+      .insert({ motion_score: maxDelta.current, passed: moved })
+      .select('id')
+      .single()
     if (moved) {
       capturePhoto()
       setChallengeState('success')
-      onSuccess?.(maxDelta.current)
+      onSuccess?.(maxDelta.current, inserted?.id ?? '')
     } else {
       setChallengeState('failed')
     }
