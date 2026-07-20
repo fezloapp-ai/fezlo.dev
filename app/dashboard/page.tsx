@@ -123,6 +123,51 @@ export default function DashboardPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const generateBadgeImage = () => {
+    const canvas = badgeCanvasRef.current;
+    if (!canvas || !profile) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    canvas.width = 800;
+    canvas.height = 420;
+
+    const gradient = ctx.createLinearGradient(0, 0, 800, 420);
+    gradient.addColorStop(0, "#0a0a0f");
+    gradient.addColorStop(1, "#1a1730");
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 800, 420);
+
+    ctx.beginPath();
+    ctx.arc(400, 150, 50, 0, Math.PI * 2);
+    ctx.fillStyle = "#10b981";
+    ctx.fill();
+    ctx.strokeStyle = "white";
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(378, 150);
+    ctx.lineTo(395, 170);
+    ctx.lineTo(425, 130);
+    ctx.stroke();
+
+    ctx.fillStyle = "white";
+    ctx.font = "bold 40px system-ui, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(`@${profile.handle}`, 400, 250);
+
+    ctx.fillStyle = "#a5b4fc";
+    ctx.font = "600 22px system-ui, sans-serif";
+    ctx.fillText("Vérifié par Fezlo", 400, 290);
+
+    ctx.fillStyle = "#71717a";
+    ctx.font = "16px system-ui, sans-serif";
+    ctx.fillText(`fezlo-app.netlify.app/signup?ref=${profile.handle}`, 400, 340);
+
+    const link = document.createElement("a");
+    link.download = `fezlo-badge-${profile.handle}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
+
   const handleCopyRef = async () => {
     if (!profile?.handle) return;
     const link = `https://fezlo-app.netlify.app/signup?ref=${profile.handle}`;
@@ -206,6 +251,10 @@ export default function DashboardPage() {
               <h3 className="mb-2 font-semibold text-sm">Aperçu de votre badge</h3>
               <p className="text-xs text-zinc-500 mb-4">Voici exactement à quoi il ressemblera sur votre site.</p>
               <div className="min-h-[32px]">{profile.badge_token && <BadgePreview token={profile.badge_token} />}</div>
+              <canvas ref={badgeCanvasRef} style={{ display: "none" }} />
+              <button onClick={generateBadgeImage} className="mt-4 w-full rounded-lg border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-white hover:bg-white/10">
+                Télécharger mon badge (image)
+              </button>
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 mb-6">
