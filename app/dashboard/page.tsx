@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 import WebcamCapture from "@/components/WebcamCapture";
@@ -18,11 +18,14 @@ interface Profile {
 export default function DashboardPage() {
   const router = useRouter();
   const supabase = createClient();
+  const previewRef = useRef<HTMLDivElement>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [referredCount, setReferredCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [showCapture, setShowCapture] = useState(false);
   const [verifying, setVerifying] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copiedRef, setCopiedRef] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -38,10 +41,26 @@ export default function DashboardPage() {
         return;
       }
       setProfile(data);
+      if (data.handle) {
+        const { count } = await supabase
+          .from("profiles")
+          .select("id", { count: "exact", head: true })
+          .eq("referred_by", data.handle);
+        setReferredCount(count ?? 0);
+      }
       setLoading(false);
     };
     fetchProfile();
   }, []);
+
+  useEffect(() => {
+    if (!profile?.badge_token || !previewRef.current) return;
+    previewRef.current.innerHTML = "";
+    const script = document.createElement("script");
+    script.src = "/widget.js";
+    script.setAttribute("data-fezlo-token", profile.badge_token);
+    previewRef.current.appendChild(script);
+  }, [profile?.badge_token]);
 
   const handleVerificationSuccess = async () => {
     setVerifying(true);
@@ -80,6 +99,14 @@ export default function DashboardPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleCopyRef = async () => {
+    if (!profile?.handle) return;
+    const link = `https://fezlo-app.netlify.app/signup?ref=${profile.handle}`;
+    await navigator.clipboard.writeText(link);
+    setCopiedRef(true);
+    setTimeout(() => setCopiedRef(false), 2000);
+  };
+
   if (loading) {
     return <main className="flex min-h-screen items-center justify-center bg-[#0a0a0f]"><div className="h-8 w-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" /></main>;
   }
@@ -90,6 +117,7 @@ export default function DashboardPage() {
   const isVerified = profile.verified_at !== null;
   const displayHandle = profile.handle ?? "utilisateur";
   const embedCode = `<script src="https://fezlo-app.netlify.app/widget.js" data-fezlo-token="${profile.badge_token}"></script>`;
+  const refLink = `https://fezlo-app.netlify.app/signup?ref=${displayHandle}`;
 
   return (
     <main className="min-h-screen bg-[#0a0a0f] text-white">
@@ -113,11 +141,13 @@ export default function DashboardPage() {
             )}
           </div>
         </div>
+
         <div className="mb-8 rounded-2xl border border-white/10 bg-white/[0.02] p-6">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="rounded-xl bg-white/5 p-4">
               <p className="mb-1 text-xs text-zinc-500">Score de confiance</p>
               <p className="text-3xl font-bold text-indigo-400">{profile.trust_score}</p>
+              <p className="mt-1 text-[11px] text-zinc-600">Augmente avec votre vérification et vos parrainages</p>
             </div>
             <div className="rounded-xl bg-white/5 p-4">
               <p className="mb-1 text-xs text-zinc-500">Niveau de badge</p>
@@ -127,33 +157,61 @@ export default function DashboardPage() {
             </div>
           </div>
         </div>
+
         {!isVerified && !showCapture && (
-          <button onClick={() => setShowCapture(true)} className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-semibold text-white hover:opacity-90">
-            Se vérifier maintenant
-          </button>
+          <div className="mb-6 rounded-2xl border border-indigo-500/20 bg-indigo-500/5 p-6">
+            <h3 className="mb-2 font-semibold text-sm">Bienvenue sur Fezlo 👋</h3>
+            <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
+              Une seule vérification (webcam, 4 secondes) vous donne un badge que vous pourrez
+              afficher partout sur le web pour prouver que vous êtes humain — sans avoir à
+              recommencer ailleurs.
+            </p>
+            <button onClick={() => setShowCapture(true)} className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-semibold text-white hover:opacity-90">
+              Se vérifier maintenant
+            </button>
+          </div>
         )}
+
         {isVerified && (
           <>
             <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 text-center mb-6">
               <p className="text-sm text-emerald-400">✅ Vous êtes vérifié.</p>
             </div>
-            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 mb-6">
+              <h3 className="mb-2 font-semibold text-sm">Aperçu de votre badge</h3>
+              <p className="text-xs text-zinc-500 mb-4">Voici exactement à quoi il ressemblera sur votre site.</p>
+              <div ref={previewRef} className="min-h-[32px]" />
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 mb-6">
               <h3 className="mb-2 font-semibold text-sm">Votre badge, sur n'importe quel site</h3>
               <p className="text-xs text-zinc-500 mb-4">
-                Ce code contient votre identifiant personnel de badge — il ne permet que d'afficher votre statut de vérification, rien d'autre. Collez-le dans le HTML de votre site pour afficher votre badge Fezlo.
+                Ce code contient votre identifiant personnel de badge — il ne permet que d'afficher votre statut de vérification, rien d'autre. Collez-le dans le HTML de votre site.
               </p>
               <pre className="bg-black/40 rounded-lg p-3 text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all">
                 {embedCode}
               </pre>
-              <button
-                onClick={handleCopy}
-                className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-white hover:bg-white/10"
-              >
+              <button onClick={handleCopy} className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-white hover:bg-white/10">
                 {copied ? "Copié ✓" : "Copier le code"}
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+              <h3 className="mb-2 font-semibold text-sm">Invitez vos proches</h3>
+              <p className="text-xs text-zinc-500 mb-4">
+                {referredCount} personne{referredCount !== 1 ? "s" : ""} déjà invitée{referredCount !== 1 ? "s" : ""} via votre lien.
+              </p>
+              <pre className="bg-black/40 rounded-lg p-3 text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all">
+                {refLink}
+              </pre>
+              <button onClick={handleCopyRef} className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-white hover:bg-white/10">
+                {copiedRef ? "Copié ✓" : "Copier mon lien"}
               </button>
             </div>
           </>
         )}
+
         {showCapture && (
           <div className="mt-6 rounded-2xl border border-white/10 bg-[#111118] p-6">
             <div className="mb-4 flex items-center justify-between">

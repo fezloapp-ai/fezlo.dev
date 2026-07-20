@@ -1,11 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase";
 
-export default function SignupPage() {
+function SignupInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const refHandle = searchParams.get("ref");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [handle, setHandle] = useState("");
@@ -29,7 +31,7 @@ export default function SignupPage() {
     }
     if (data.user) {
       const { error: profileError } = await supabase.from("profiles").insert([
-        { id: data.user.id, handle: handle.trim() },
+        { id: data.user.id, handle: handle.trim(), referred_by: refHandle || null },
       ]);
       if (profileError && profileError.code !== "23505") {
         setStatus("error");
@@ -60,7 +62,9 @@ export default function SignupPage() {
         </div>
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-8">
           <h1 className="mb-1 text-xl font-bold text-white">Créer un compte</h1>
-          <p className="mb-6 text-sm text-zinc-500">Rejoignez Fezlo et prouvez votre humanité.</p>
+          <p className="mb-6 text-sm text-zinc-500">
+            {refHandle ? `Invité(e) par @${refHandle} · ` : ""}Rejoignez Fezlo et prouvez votre humanité.
+          </p>
           <button onClick={handleGoogleSignup} className="mb-6 flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-white hover:bg-white/10">
             Continuer avec Google
           </button>
@@ -80,5 +84,13 @@ export default function SignupPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupInner />
+    </Suspense>
   );
 }
