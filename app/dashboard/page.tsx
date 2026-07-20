@@ -1,25 +1,22 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase";
+import WebcamCapture from "@/components/WebcamCapture";
 
 function BadgePreview({ token }: { token: string }) {
   const [state, setState] = useState<"loading" | "verified" | "not_verified" | "error">("loading");
-  const [errMsg, setErrMsg] = useState("");
 
   useEffect(() => {
     fetch("/api/verify/" + encodeURIComponent(token))
       .then((res) => res.json())
-      .then((data) => {
-        setState(data.verified ? "verified" : "not_verified");
-      })
-      .catch((err) => {
-        setState("error");
-        setErrMsg(String(err));
-      });
+      .then((data) => setState(data.verified ? "verified" : "not_verified"))
+      .catch(() => setState("error"));
   }, [token]);
 
   if (state === "loading") return <span className="text-xs text-zinc-500">Chargement...</span>;
-  if (state === "error") return <span className="text-xs text-red-500 break-all">Erreur: {errMsg}</span>;
+  if (state === "error") return <span className="text-xs text-red-500">Erreur de chargement</span>;
   if (state === "not_verified") return <span className="text-xs text-zinc-500">Non vérifié</span>;
   return (
     <a href="https://fezlo-app.netlify.app" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-600 border border-emerald-200">
@@ -27,9 +24,6 @@ function BadgePreview({ token }: { token: string }) {
     </a>
   );
 }
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase";
-import WebcamCapture from "@/components/WebcamCapture";
 
 interface Profile {
   id: string;
@@ -44,6 +38,7 @@ interface Profile {
 export default function DashboardPage() {
   const router = useRouter();
   const supabase = createClient();
+  const badgeCanvasRef = useRef<HTMLCanvasElement>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [referredCount, setReferredCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -51,6 +46,7 @@ export default function DashboardPage() {
   const [verifying, setVerifying] = useState(false);
   const [copied, setCopied] = useState(false);
   const [copiedRef, setCopiedRef] = useState(false);
+  const [copiedVerifyLink, setCopiedVerifyLink] = useState(false);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -65,7 +61,6 @@ export default function DashboardPage() {
         setLoading(false);
         return;
       }
-      setProfile(data);
       if (!data.referred_by && typeof window !== "undefined") {
         const pendingRef = localStorage.getItem("fezlo_pending_ref");
         if (pendingRef) {
@@ -74,6 +69,7 @@ export default function DashboardPage() {
           data.referred_by = pendingRef;
         }
       }
+      setProfile(data);
       if (data.handle) {
         const { count } = await supabase
           .from("profiles")
@@ -123,6 +119,22 @@ export default function DashboardPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleCopyVerifyLink = async () => {
+    if (!profile?.badge_token) return;
+    const link = `https://fezlo-app.netlify.app/v/${profile.badge_token}`;
+    await navigator.clipboard.writeText(link);
+    setCopiedVerifyLink(true);
+    setTimeout(() => setCopiedVerifyLink(false), 2000);
+  };
+
+  const handleCopyRef = async () => {
+    if (!profile?.handle) return;
+    const link = `https://fezlo-app.netlify.app/signup?ref=${profile.handle}`;
+    await navigator.clipboard.writeText(link);
+    setCopiedRef(true);
+    setTimeout(() => setCopiedRef(false), 2000);
+  };
+
   const generateBadgeImage = () => {
     const canvas = badgeCanvasRef.current;
     if (!canvas || !profile) return;
@@ -160,20 +172,12 @@ export default function DashboardPage() {
 
     ctx.fillStyle = "#71717a";
     ctx.font = "16px system-ui, sans-serif";
-    ctx.fillText(`fezlo-app.netlify.app/signup?ref=${profile.handle}`, 400, 340);
+    ctx.fillText(`fezlo-app.netlify.app/v/${profile.badge_token}`, 400, 340);
 
     const link = document.createElement("a");
     link.download = `fezlo-badge-${profile.handle}.png`;
     link.href = canvas.toDataURL("image/png");
     link.click();
-  };
-
-  const handleCopyRef = async () => {
-    if (!profile?.handle) return;
-    const link = `https://fezlo-app.netlify.app/signup?ref=${profile.handle}`;
-    await navigator.clipboard.writeText(link);
-    setCopiedRef(true);
-    setTimeout(() => setCopiedRef(false), 2000);
   };
 
   if (loading) {
@@ -186,6 +190,7 @@ export default function DashboardPage() {
   const isVerified = profile.verified_at !== null;
   const displayHandle = profile.handle ?? "utilisateur";
   const embedCode = `<script src="https://fezlo-app.netlify.app/widget.js" data-fezlo-token="${profile.badge_token}"></script>`;
+  const verifyLink = `https://fezlo-app.netlify.app/v/${profile.badge_token}`;
   const refLink = `https://fezlo-app.netlify.app/signup?ref=${displayHandle}`;
 
   return (
@@ -232,8 +237,7 @@ export default function DashboardPage() {
             <h3 className="mb-2 font-semibold text-sm">Bienvenue sur Fezlo 👋</h3>
             <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
               Une seule vérification (webcam, 4 secondes) vous donne un badge que vous pourrez
-              afficher partout sur le web pour prouver que vous êtes humain — sans avoir à
-              recommencer ailleurs.
+              afficher partout sur le web pour prouver que vous êtes humain.
             </p>
             <button onClick={() => setShowCapture(true)} className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 py-3 text-sm font-semibold text-white hover:opacity-90">
               Se vérifier maintenant
@@ -249,7 +253,7 @@ export default function DashboardPage() {
 
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 mb-6">
               <h3 className="mb-2 font-semibold text-sm">Aperçu de votre badge</h3>
-              <p className="text-xs text-zinc-500 mb-4">Voici exactement à quoi il ressemblera sur votre site.</p>
+              <p className="text-xs text-zinc-500 mb-4">Voici exactement à quoi il ressemblera.</p>
               <div className="min-h-[32px]">{profile.badge_token && <BadgePreview token={profile.badge_token} />}</div>
               <canvas ref={badgeCanvasRef} style={{ display: "none" }} />
               <button onClick={generateBadgeImage} className="mt-4 w-full rounded-lg border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-white hover:bg-white/10">
@@ -258,9 +262,22 @@ export default function DashboardPage() {
             </div>
 
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 mb-6">
-              <h3 className="mb-2 font-semibold text-sm">Votre badge, sur n'importe quel site</h3>
+              <h3 className="mb-2 font-semibold text-sm">Votre lien de vérification (à mettre en bio)</h3>
               <p className="text-xs text-zinc-500 mb-4">
-                Ce code contient votre identifiant personnel de badge — il ne permet que d'afficher votre statut de vérification, rien d'autre. Collez-le dans le HTML de votre site.
+                Un simple lien à coller en bio TikTok, Instagram, YouTube ou n'importe où — il affiche votre badge quand on clique dessus.
+              </p>
+              <pre className="bg-black/40 rounded-lg p-3 text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all">
+                {verifyLink}
+              </pre>
+              <button onClick={handleCopyVerifyLink} className="mt-3 w-full rounded-lg border border-white/10 bg-white/5 py-2.5 text-sm font-medium text-white hover:bg-white/10">
+                {copiedVerifyLink ? "Copié ✓" : "Copier mon lien"}
+              </button>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6 mb-6">
+              <h3 className="mb-2 font-semibold text-sm">Votre badge, sur n'importe quel site (code)</h3>
+              <p className="text-xs text-zinc-500 mb-4">
+                Pour les développeurs : ce code affiche votre badge en direct dans une page web.
               </p>
               <pre className="bg-black/40 rounded-lg p-3 text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all">
                 {embedCode}
@@ -273,7 +290,7 @@ export default function DashboardPage() {
             <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
               <h3 className="mb-2 font-semibold text-sm">Invitez vos proches</h3>
               <p className="text-xs text-zinc-500 mb-4">
-                {referredCount} personne{referredCount !== 1 ? "s" : ""} déjà invitée{referredCount !== 1 ? "s" : ""} via votre lien.
+                {referredCount} personne{referredCount !== 1 ? "s" : ""} déjà invitée{referredCount !== 1 ? "s" : ""}.
               </p>
               <pre className="bg-black/40 rounded-lg p-3 text-xs text-zinc-300 overflow-x-auto whitespace-pre-wrap break-all">
                 {refLink}
